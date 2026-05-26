@@ -1,0 +1,804 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OC 角色数据配置工具 - 智能多轴联动版</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .table-input { @apply border border-gray-300 px-1 py-0.5 w-full rounded focus:outline-none focus:border-blue-500 text-xs text-left bg-white text-gray-800; }
+        .table-select { @apply border border-gray-300 px-0.5 py-0.5 rounded focus:outline-none focus:border-blue-500 text-[11px] bg-gray-50; }
+        .tab-btn-active { @apply border-b-2 border-blue-500 text-blue-600 font-bold; }
+        .excel-cell { @apply p-1.5 border border-gray-200 transition-colors duration-150 align-top; }
+        .cell-mandatory { @apply bg-amber-50/80; }
+        .custom-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+    </style>
+</head>
+<body class="bg-gray-100 h-screen flex flex-col font-sans overflow-hidden">
+
+    <datalist id="location-list">
+        <option value="福源堂"><option value="九木酒屋"><option value="摸鱼网咖"><option value="LF 一中"><option value="肆的家"><option value="艺术街区"><option value="Valmont Plaza 购物中心"><option value="白日 Livehouse"> <option value="警署"><option value="旧港码头"><option value="旧港集市"><option value="小林的算命摊"> <option value="八爪胡同"><option value="真辉的公寓"><option value="小林的阁楼"><option value="融大附中"> <option value="市民公园"><option value="晴南的家"><option value="6-11 便利店"><option value="幻日乐队排练室"> <option value="Wesley 的家"><option value="奶奶的杂货铺"><option value="雾港仓库"><option value="Berlon 家老宅"> <option value="渔场"><option value="地下拳场"><option value="能乐町"><option value="悠真的出租屋"> <option value="Olivia 的出租屋"><option value="深蓝海岸"><option value="Adriana 的房车"><option value="水怪出没区"> <option value="Felix 的住所"><option value="猎人小屋"><option value="Valmont's 会员商店"><option value="CULF/LF 大学城"> <option value="凌的单人公寓"><option value="在地铁上"><option value="魔鬼鱼号">
+    </datalist>
+
+    <header class="bg-white shadow px-6 py-2 flex justify-between items-center shrink-0">
+        <div class="flex items-center gap-4">
+            <h1 class="text-base font-bold text-gray-800">🎭 OC 角色数据标准大轴配置工具</h1>
+            <label class="bg-amber-500 hover:bg-amber-600 text-white px-2.5 py-1 rounded text-xs font-medium cursor-pointer transition">
+                📥 导入已有 JSON <input type="file" id="import-file" accept=".json" class="hidden" onchange="importJSON(event)">
+            </label>
+            <div class="h-4 w-px bg-gray-300 mx-2"></div>
+            <div class="flex items-center gap-1 bg-gray-50 border border-gray-200 px-2 py-1 rounded">
+                <span class="text-xs text-gray-500">勾选行合并到：</span>
+                <select id="target-merge-day" class="text-xs border rounded px-1 bg-white focus:outline-none">
+                    <option value="0">周日 (W0)</option>
+                    <option value="1">周一 (W1)</option>
+                    <option value="2">周二 (W2)</option>
+                    <option value="3">周三 (W3)</option>
+                    <option value="4">周四 (W4)</option>
+                    <option value="5">周五 (W5)</option>
+                    <option value="6">周六 (W6)</option>
+                </select>
+                <button onclick="mergeCheckedRows()" class="bg-blue-500 hover:bg-blue-600 text-white px-2.5 py-0.5 rounded text-xs font-medium transition shadow-sm">执行合并</button>
+            </div>
+        </div>
+        <div class="space-x-2">
+            <button onclick="copyJSON()" class="bg-gray-600 hover:bg-gray-700 text-white px-3 py-1.5 rounded text-xs font-medium transition">一键复制 JSON</button>
+            <button onclick="downloadJSON()" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded text-xs font-medium transition">下载 .json 文件</button>
+        </div>
+    </header>
+
+    <main class="flex-1 flex overflow-hidden p-2 gap-2">
+        <section class="w-[70%] bg-white rounded-lg shadow flex flex-col overflow-hidden">
+            <div class="flex border-b border-gray-200 bg-gray-50 shrink-0 text-xs">
+                <button onclick="switchTab('m1')" id="tab-m1" class="px-4 py-2 text-gray-600 hover:text-blue-500 tab-btn-active">1. 基础信息</button>
+                <button onclick="switchTab('m2')" id="tab-m2" class="px-4 py-2 text-gray-600 hover:text-blue-500">2. 全天日程总表 (00:00-24:00)</button>
+                <button onclick="switchTab('m3')" id="tab-m3" class="px-4 py-2 text-gray-600 hover:text-blue-500 flex items-center gap-1">3. 必然随机事件库 <span id="m3-badge" class="bg-amber-500 text-white font-mono rounded-full px-1.5 py-0.2 text-[10px] hidden">0</span></button>
+                <button onclick="switchTab('m4')" id="tab-m4" class="px-4 py-2 text-gray-600 hover:text-blue-500">4. 真随机事件 (不绑定死时间)</button>
+                <button onclick="switchTab('m5')" id="tab-m5" class="px-4 py-2 text-gray-600 hover:text-blue-500 flex items-center gap-1">5. 地点随机话术池 <span id="m5-badge" class="bg-blue-500 text-white font-mono rounded-full px-1.5 py-0.2 text-[10px] hidden">0</span></button>
+            </div>
+
+            <div class="flex-1 overflow-y-auto p-4 custom-scroll">
+                <div id="content-m1" class="tab-content space-y-4">
+                    <div class="grid grid-cols-2 gap-4 max-w-xl">
+                        <div>
+                            <label class="block text-xs font-medium text-gray-500 mb-1">角色姓名 (name)</label>
+                            <input type="text" id="m1-name" value="肆" oninput="updateAll()" class="w-full border border-gray-300 rounded px-3 py-1.5 text-xs focus:outline-none focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-500 mb-1">头像路径 (avatar)</label>
+                            <input type="text" id="m1-avatar" value="./images/avatar/si.png" oninput="updateAll()" class="w-full border border-gray-300 rounded px-3 py-1.5 text-xs focus:outline-none focus:border-blue-500">
+                        </div>
+                    </div>
+                </div>
+
+                <div id="content-m2" class="tab-content hidden h-full flex flex-col">
+                    <div class="flex-1 overflow-auto border border-gray-200 rounded custom-scroll bg-white">
+                        <table class="w-full text-left border-collapse table-fixed min-w-[1250px]" id="excel-main-table">
+                            <thead>
+                                <tr class="bg-gray-100 text-xs font-medium text-gray-600 text-center border-b border-gray-300 sticky top-0 z-20">
+                                    <th class="p-1 border-r border-b w-[45px] bg-gray-100">选择</th>
+                                    <th class="p-1 border-r border-b w-[90px] bg-gray-100">时间段</th>
+                                    <th class="p-1 border-r border-b bg-gray-100">周日 (W0)</th>
+                                    <th class="p-1 border-r border-b bg-gray-100">周一 (W1)</th>
+                                    <th class="p-1 border-r border-b bg-gray-100">周二 (W2)</th>
+                                    <th class="p-1 border-r border-b bg-gray-100">周三 (W3)</th>
+                                    <th class="p-1 border-r border-b bg-gray-100">周四 (W4)</th>
+                                    <th class="p-1 border-r border-b bg-gray-100">周五 (W5)</th>
+                                    <th class="p-1 border-r border-b bg-gray-100">周六 (W6)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbody-timeline"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div id="content-m3" class="tab-content hidden space-y-4">
+                    <div class="bg-blue-50 border border-blue-200 p-2.5 rounded text-xs text-blue-700">
+                        💡 <strong>智能时段联动：</strong>下方列表是根据你在大表中选择的随机时间段自动生成的独立事件盒。直接在各时间盒中点击增加小事件分支即可。
+                    </div>
+                    <div id="mandatory-containers-root" class="space-y-4">
+                        <div class="text-center py-8 text-gray-400 text-xs">暂无联动数据，请先去大表中选择“必然随机事件”</div>
+                    </div>
+                </div>
+
+                <div id="content-m4" class="tab-content hidden space-y-3">
+                    <div class="flex justify-between items-center">
+                        <span class="text-xs text-gray-400">脱离大轴固定排程的纯概率真随机事件池。</span>
+                        <button onclick="addTrueRandomRow()" class="bg-gray-800 text-white px-3 py-1 rounded text-xs hover:bg-gray-700">+ 增加真随机项</button>
+                    </div>
+                    <div class="border rounded overflow-hidden">
+                        <table class="w-full border-collapse text-xs">
+                            <thead>
+                                <tr class="bg-gray-50 border-b text-gray-500 font-medium text-center">
+                                    <th class="p-1 border-r w-24">事件ID</th>
+                                    <th class="p-1 border-r w-20">触发周</th>
+                                    <th class="p-1 border-r w-28">时间范围</th>
+                                    <th class="p-1 border-r w-14">概率%</th>
+                                    <th class="p-1 border-r w-36">指定地点</th>
+                                    <th class="p-1 border-r w-20">类别</th>
+                                    <th class="p-1 border-r">动作描述/对话文本</th>
+                                    <th class="p-1 border-r w-16">持续</th>
+                                    <th class="p-1 border-r">剧情提示(tip)</th>
+                                    <th class="p-1 w-12">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbody-true-random"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div id="content-m5" class="tab-content hidden space-y-3">
+                    <div class="bg-emerald-50 border border-emerald-200 p-2.5 rounded text-xs text-emerald-700">
+                        ✨ <strong>话术池管理：</strong>系统已自动提取您在排程中使用的所有 <strong>地点 + 类别</strong> 组合。您可以为每个组合灵活添加任意多条独立对白，无需再用逗号隔开！
+                    </div>
+                    <div class="border rounded overflow-hidden bg-white">
+                        <table class="w-full border-collapse text-xs">
+                            <thead>
+                                <tr class="bg-gray-50 border-b text-gray-500 font-medium">
+                                    <th class="p-1.5 border-r w-40 text-center bg-gray-50">捕捉到的地点 (area)</th>
+                                    <th class="p-1.5 border-r w-28 text-center bg-gray-50">活动类别 (type)</th>
+                                    <th class="p-1.5 px-3 text-left bg-gray-50">随机话术独立配置列表（点击右侧按钮新增）</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbody-location-texts">
+                                <tr class="text-center text-gray-400"><td colspan="3" class="p-4">暂无被捕获的地点数据，请先在其他页面填写内容。</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="w-[30%] bg-gray-900 rounded-lg flex flex-col overflow-hidden text-xs text-slate-300 font-mono shadow">
+            <div class="bg-gray-800 px-3 py-2 text-gray-400 font-medium border-b border-gray-700 select-none">实时数据编译预览 (JSON)</div>
+            <pre class="flex-1 p-3 overflow-auto bg-gray-950 text-emerald-400 custom-scroll select-all" id="json-output"></pre>
+        </section>
+    </main>
+
+    <script>
+        const TIME_SLOTS = [];
+        for (let h = 0; h < 24; h++) {
+            const pH = h.toString().padStart(2, '0');
+            TIME_SLOTS.push(`${pH}:00–${pH}:30`);
+            TIME_SLOTS.push(`${pH}:30–${(h + 1).toString().padStart(2, '0')}:00`);
+        }
+
+        let MANDATORY_BRANCHES_DATA = {};  
+        let LOCATION_TEXTS_CACHE = {}; 
+
+        function initTimelineTable() {
+            const tbody = document.getElementById('tbody-timeline');
+            tbody.innerHTML = "";
+            
+            TIME_SLOTS.forEach((slot, index) => {
+                const tr = document.createElement('tr');
+                tr.className = "border-b border-gray-100 hover:bg-gray-50/60";
+                
+                let dayCells = "";
+                for (let d = 0; d <= 6; d++) {
+                    dayCells += `
+                        <td class="excel-cell" data-day="${d}" data-slot-index="${index}" data-slot="${slot}" id="cell-${d}-${index}">
+                            <div class="flex flex-col gap-1">
+                                <div class="flex gap-1 items-center">
+                                    <select class="table-select cell-main-dropdown" onchange="handleTypeChange(this)">
+                                        <option value="fixed">固定日程</option>
+                                        <option value="mandatory">必然随机事件</option>
+                                    </select>
+                                    <div class="hidden item-group-wrapper items-center gap-0.5">
+                                        <span class="text-[10px] text-amber-600 font-bold">组</span>
+                                        <input type="number" value="1" min="1" class="w-7 text-center border border-amber-300 bg-amber-50 text-amber-900 rounded text-[11px] font-bold cell-group-id" oninput="updateAll()">
+                                    </div>
+                                    <button onclick="splitCell(this)" class="text-[10px] text-gray-400 hover:text-red-500 hidden btn-split" title="拆分复原">🔓</button>
+                                </div>
+                                <div class="space-y-0.5 cell-input-container">
+                                    <input type="text" placeholder="地点" list="location-list" class="table-input font-medium cell-area">
+                                    <input type="text" placeholder="类别 (type)" class="table-input cell-type">
+                                    <input type="text" placeholder="动作 (action)" class="table-input cell-action">
+                                </div>
+                            </div>
+                        </td>
+                    `;
+                }
+
+                tr.innerHTML = `
+                    <td class="p-1 border-r text-center bg-gray-50 sticky left-0 z-10"><input type="checkbox" class="row-checker" data-index="${index}"></td>
+                    <td class="p-1 border-r text-center font-mono text-gray-400 text-[10px] bg-gray-50/50 select-none">${slot}</td>
+                    ${dayCells}
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function handleTypeChange(select) {
+            const cell = select.closest('.excel-cell');
+            const groupWrapper = cell.querySelector('.item-group-wrapper');
+            const inputContainer = cell.querySelector('.cell-input-container');
+
+            if (select.value === 'mandatory') {
+                cell.classList.add('cell-mandatory');
+                groupWrapper.classList.remove('hidden');
+                groupWrapper.classList.add('flex');
+                inputContainer.classList.add('hidden');
+            } else {
+                cell.classList.remove('cell-mandatory');
+                groupWrapper.classList.add('hidden');
+                groupWrapper.classList.remove('flex');
+                inputContainer.classList.remove('hidden');
+            }
+            updateAll();
+        }
+
+        function mergeCheckedRows() {
+            const checkedBoxes = document.querySelectorAll('.row-checker:checked');
+            if (checkedBoxes.length <= 1) { alert("请在左侧勾选 2 个或以上的时间时段！"); return; }
+            const targetDay = document.getElementById('target-merge-day').value;
+            const indices = Array.from(checkedBoxes).map(cb => parseInt(cb.getAttribute('data-index'))).sort((a, b) => a - b);
+            for (let i = 0; i < indices.length - 1; i++) {
+                if (indices[i+1] - indices[i] !== 1) { alert("合并失败：所勾选的时间格必须是完全连续的！"); return; }
+            }
+            const startIdx = indices[0];
+            const masterCell = document.getElementById(`cell-${targetDay}-${startIdx}`);
+            if (!masterCell || masterCell.style.display === 'none') { alert("合并位置冲突，请先确保目标没有被合并覆盖。"); return; }
+
+            masterCell.rowSpan = indices.length;
+            masterCell.querySelector('.btn-split').classList.remove('hidden');
+            masterCell.classList.add('bg-slate-50', 'border-b-2', 'border-b-blue-400');
+
+            const hiddenIds = [];
+            for (let i = 1; i < indices.length; i++) {
+                const subCell = document.getElementById(`cell-${targetDay}-${indices[i]}`);
+                if (subCell) { subCell.style.display = 'none'; hiddenIds.push(subCell.id); }
+            }
+            masterCell.setAttribute('data-merged-ids', JSON.stringify(hiddenIds));
+            checkedBoxes.forEach(cb => cb.checked = false);
+            updateAll();
+        }
+
+        function splitCell(btn) {
+            const masterCell = btn.closest('.excel-cell');
+            masterCell.rowSpan = 1;
+            btn.classList.add('hidden');
+            masterCell.classList.remove('bg-slate-50', 'border-b-2', 'border-b-blue-400');
+            const hiddenIds = JSON.parse(masterCell.getAttribute('data-merged-ids') || '[]');
+            hiddenIds.forEach(id => { const cell = document.getElementById(id); if (cell) cell.style.display = ''; });
+            masterCell.removeAttribute('data-merged-ids');
+            updateAll();
+        }
+
+        function syncMandatoryContainersHTML(detectedList) {
+            const root = document.getElementById('mandatory-containers-root');
+            const badge = document.getElementById('m3-badge');
+            
+            const uniqueBoxes = [];
+            const seenKeys = new Set();
+            
+            detectedList.forEach(item => {
+                const boxFeatureKey = `T${item.timeRange}_G${item.groupId}`;
+                if(!seenKeys.has(boxFeatureKey)) {
+                    seenKeys.add(boxFeatureKey);
+                    uniqueBoxes.push(item);
+                }
+            });
+
+            if (uniqueBoxes.length === 0) {
+                root.innerHTML = `<div class="text-center py-8 text-gray-400 text-xs">暂无联动数据，请先去大表中选择“必然随机事件”</div>`;
+                badge.classList.add('hidden');
+                return;
+            }
+            badge.textContent = uniqueBoxes.length;
+            badge.classList.remove('hidden');
+
+            saveAllCurrentBranchInputs();
+
+            let html = "";
+            uniqueBoxes.forEach(item => {
+                const cacheKey = `T${item.timeRange}_G${item.groupId}`;
+                const branches = MANDATORY_BRANCHES_DATA[cacheKey] || [ {probability: 50, area: '', type: 'rest', action: ''} ];
+                MANDATORY_BRANCHES_DATA[cacheKey] = branches;
+
+                let rowsHtml = "";
+                branches.forEach((b, bIdx) => {
+                    rowsHtml += `
+                        <tr class="branch-row" data-cache-key="${cacheKey}">
+                            <td class="p-1 border-r text-center font-bold text-amber-700 bg-amber-50/50">分枝 ${bIdx + 1}</td>
+                            <td class="p-1 border-r"><input type="number" value="${b.probability}" class="w-full text-center border-0 p-0 b-prob"></td>
+                            <td class="p-1 border-r"><input type="text" value="${b.area || ''}" list="location-list" class="w-full border-0 p-0 b-area"></td>
+                            <td class="p-1 border-r"><input type="text" value="${b.type || 'rest'}" class="w-full border-0 p-0 b-type"></td>
+                            <td class="p-1 border-r"><input type="text" value="${b.action || ''}" class="w-full border-0 p-0 b-action"></td>
+                            <td class="p-1 text-center"><button onclick="deleteBranchRow(this, '${cacheKey}', ${bIdx})" class="text-gray-300 hover:text-red-500 font-bold text-sm">×</button></td>
+                        </tr>
+                    `;
+                });
+
+                const tiedWeeks = detectedList.filter(x => x.timeRange === item.timeRange && x.groupId === item.groupId).map(x => `周${x.day}`).join(', ');
+
+                html += `
+                    <div class="bg-white border border-amber-200 rounded shadow-sm overflow-hidden" id="box-${cacheKey}">
+                        <div class="bg-amber-100/70 px-3 py-1.5 flex justify-between items-center border-b border-amber-200">
+                            <div class="flex items-center gap-3">
+                                <span class="bg-amber-600 text-white font-bold rounded px-1.5 py-0.5 text-[10px]">必然随机组 ${item.groupId}</span>
+                                <span class="text-xs font-semibold text-gray-700">联动范围：[ ${tiedWeeks} ] 的 (${item.timeRange})</span>
+                            </div>
+                            <button onclick="addBranchRow('${cacheKey}')" class="bg-amber-600 hover:bg-amber-700 text-white font-medium px-2 py-0.5 rounded text-[11px] transition">+ 增加小事件分支</button>
+                        </div>
+                        <table class="w-full text-xs">
+                            <thead>
+                                <tr class="bg-gray-50 border-b text-gray-500 font-medium text-center">
+                                    <th class="p-1 border-r w-20">分支</th>
+                                    <th class="p-1 border-r w-20">概率(%)</th>
+                                    <th class="p-1 border-r w-44">发生地点</th>
+                                    <th class="p-1 border-r w-24">类别(type)</th>
+                                    <th class="p-1 border-r px-2 text-left">具体动作描述 (action)</th>
+                                    <th class="p-1 w-12">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>${rowsHtml}</tbody>
+                        </table>
+                    </div>
+                `;
+            });
+            root.innerHTML = html;
+            root.querySelectorAll('input').forEach(input => { input.addEventListener('input', () => { saveAllCurrentBranchInputs(); updateAll(); }); });
+        }
+
+        function saveAllCurrentBranchInputs() {
+            document.querySelectorAll('.branch-row').forEach(row => {
+                const key = row.getAttribute('data-cache-key');
+                const rowsInKey = Array.from(document.querySelectorAll(`[data-cache-key="${key}"]`));
+                const idx = rowsInKey.indexOf(row);
+                if (idx === -1) return;
+                if (!MANDATORY_BRANCHES_DATA[key]) MANDATORY_BRANCHES_DATA[key] = [];
+                MANDATORY_BRANCHES_DATA[key][idx] = {
+                    probability: parseInt(row.querySelector('.b-prob').value, 10) || 0,
+                    area: row.querySelector('.b-area').value.trim(),
+                    type: row.querySelector('.b-type').value.trim() || "rest",
+                    action: row.querySelector('.b-action').value.trim()
+                };
+            });
+        }
+
+        function addBranchRow(cacheKey) {
+            saveAllCurrentBranchInputs();
+            if (!MANDATORY_BRANCHES_DATA[cacheKey]) MANDATORY_BRANCHES_DATA[cacheKey] = [];
+            MANDATORY_BRANCHES_DATA[cacheKey].push({probability: 10, area: '', type: 'rest', action: ''});
+            updateAll();
+        }
+
+        function deleteBranchRow(btn, cacheKey, idx) {
+            saveAllCurrentBranchInputs();
+            if (MANDATORY_BRANCHES_DATA[cacheKey]) {
+                MANDATORY_BRANCHES_DATA[cacheKey].splice(idx, 1);
+                if (MANDATORY_BRANCHES_DATA[cacheKey].length === 0) MANDATORY_BRANCHES_DATA[cacheKey] = [{probability: 10, area: '', type: 'rest', action: ''}];
+            }
+            updateAll();
+        }
+
+        function syncLocationTextsHTML(uniqueLocations) {
+            const tbody = document.getElementById('tbody-location-texts');
+            const badge = document.getElementById('m5-badge');
+            
+            document.querySelectorAll('.loc-text-row').forEach(row => {
+                const k = row.getAttribute('data-loc-key');
+                const textInputs = row.querySelectorAll('.loc-text-input');
+                LOCATION_TEXTS_CACHE[k] = Array.from(textInputs).map(input => input.value.trim()).filter(v => v !== "");
+            });
+
+            if (uniqueLocations.size === 0) {
+                tbody.innerHTML = `<tr class="text-center text-gray-400"><td colspan="3" class="p-4">暂无被捕获的地点数据，请先在其他页面填写内容。</td></tr>`;
+                badge.classList.add('hidden');
+                return;
+            }
+
+            badge.textContent = uniqueLocations.size;
+            badge.classList.remove('hidden');
+
+            let html = "";
+            Array.from(uniqueLocations).sort().forEach(key => {
+                const [area, type] = key.split('|||');
+                const textList = LOCATION_TEXTS_CACHE[key] || [""];
+                if (textList.length === 0) textList.push("");
+
+                let inputsHtml = `<div class="space-y-1.5 py-1.5 text-list-container" data-loc-key="${key}">`;
+                textList.forEach((textVal, tIdx) => {
+                    inputsHtml += `
+                        <div class="flex items-center gap-2 text-item-row">
+                            <span class="text-[10px] text-gray-400 font-mono w-5 shrink-0 text-right">#${tIdx+1}</span>
+                            <input type="text" value="${textVal.replace(/"/g, '&quot;')}" placeholder="请输入一句完整的独立话术内容" 
+                                   class="flex-1 border border-gray-200 rounded px-2 py-1 text-xs focus:outline-none focus:border-blue-500 bg-slate-50/50 focus:bg-white loc-text-input">
+                            <button onclick="deleteTextRow(this)" class="text-gray-300 hover:text-red-500 text-sm px-1 font-bold transition" title="删除这句">×</button>
+                        </div>
+                    `;
+                });
+                inputsHtml += `</div>`;
+
+                html += `
+                    <tr class="border-b hover:bg-slate-50/40 loc-text-row align-top" data-loc-key="${key}">
+                        <td class="p-2.5 border-r font-medium text-gray-700 text-center bg-gray-50/30 select-none">${area}</td>
+                        <td class="p-2.5 border-r text-center font-mono text-blue-600 bg-gray-50/30 select-none">${type}</td>
+                        <td class="p-2 px-3 flex items-start gap-4">
+                            <div class="flex-1">${inputsHtml}</div>
+                            <button onclick="addTextRow(this, '${key}')" class="shrink-0 bg-blue-50 text-blue-600 hover:bg-blue-100 px-2 py-1 rounded text-[11px] font-medium transition mt-1 border border-blue-200">+ 新增话术</button>
+                        </td>
+                    </tr>
+                `;
+            });
+            tbody.innerHTML = html;
+
+            tbody.querySelectorAll('.loc-text-input').forEach(input => {
+                input.addEventListener('input', generateJSON);
+            });
+        }
+
+        function addTextRow(btn, key) {
+            const container = btn.closest('td').querySelector('.text-list-container');
+            const currentIndex = container.querySelectorAll('.text-item-row').length;
+            
+            const div = document.createElement('div');
+            div.className = "flex items-center gap-2 text-item-row mt-1.5";
+            div.innerHTML = `
+                <span class="text-[10px] text-gray-400 font-mono w-5 shrink-0 text-right">#${currentIndex + 1}</span>
+                <input type="text" value="" placeholder="请输入一句完整的独立话术内容" 
+                       class="flex-1 border border-gray-200 rounded px-2 py-1 text-xs focus:outline-none focus:border-blue-500 bg-slate-50/50 focus:bg-white loc-text-input">
+                <button onclick="deleteTextRow(this)" class="text-gray-300 hover:text-red-500 text-sm px-1 font-bold transition" title="删除这句">×</button>
+            `;
+            container.appendChild(div);
+            div.querySelector('.loc-text-input').addEventListener('input', generateJSON);
+            generateJSON();
+        }
+
+        function deleteTextRow(btn) {
+            const container = btn.closest('.text-list-container');
+            const row = btn.closest('.text-item-row');
+            row.remove();
+            
+            container.querySelectorAll('.text-item-row').forEach((el, index) => {
+                el.querySelector('span').textContent = `#${index + 1}`;
+            });
+            generateJSON();
+        }
+
+        // --- ⭐【核心全量重写：固定大轴日程与随机事件均实现跨周完美聚合】---
+        function generateJSON() {
+            const result = {
+                name: document.getElementById('m1-name').value.trim(),
+                avatar: document.getElementById('m1-avatar').value.trim(),
+                baseSchedule: [],
+                randomEvents: [],
+                locationRandomActions: {}
+            };
+
+            const detectedMandatories = []; 
+            const uniqueLocations = new Set(); 
+
+            // 1. 固定大轴日程聚合字典：以“时间范围+地点+活动类型+具体动作”为特征键值
+            const baseScheduleMergeMap = {};
+
+            for (let d = 0; d <= 6; d++) {
+                for (let i = 0; i < TIME_SLOTS.length; i++) {
+                    const cell = document.getElementById(`cell-${d}-${i}`);
+                    if (!cell || cell.style.display === 'none') continue;
+
+                    const selectVal = cell.querySelector('.cell-main-dropdown').value;
+                    const groupId = cell.querySelector('.cell-group-id').value || "1";
+
+                    let finalTimeRange = cell.getAttribute('data-slot').replace('–', '-');
+                    if (cell.rowSpan > 1) {
+                        const startStr = TIME_SLOTS[i].split('–')[0];
+                        const endStr = TIME_SLOTS[i + cell.rowSpan - 1].split('–')[1];
+                        finalTimeRange = `${startStr}-${endStr}`;
+                    }
+
+                    // 拦截必然随机事件，送去独立的分流聚合引擎中
+                    if (selectVal === 'mandatory') {
+                        detectedMandatories.push({ day: d, timeRange: finalTimeRange, groupId: groupId });
+                        continue; 
+                    }
+
+                    const area = cell.querySelector('.cell-area').value.trim();
+                    const type = cell.querySelector('.cell-type').value.trim() || "rest";
+                    const action = cell.querySelector('.cell-action').value.trim();
+
+                    if (!area && !action) continue;
+                    if (area) { uniqueLocations.add(`${area}|||${type}`); } 
+
+                    // 构造固定日程的指纹
+                    const scheduleFingerprint = `${finalTimeRange}|||${area}|||${type}|||${action}`;
+
+                    if (!baseScheduleMergeMap[scheduleFingerprint]) {
+                        baseScheduleMergeMap[scheduleFingerprint] = {
+                            weeks: new Set([d]),
+                            timeRange: finalTimeRange, area: area, type: type, action: action
+                        };
+                    } else {
+                        baseScheduleMergeMap[scheduleFingerprint].weeks.add(d);
+                    }
+                }
+            }
+
+            // 转化并装填合并后的标准 baseSchedule 结构
+            // 目标格式：每一个独特的周几组合 [0, 1] 对应包含它所拥有的全天时间块数组
+            const groupedByWeeks = {};
+            for (const finger in baseScheduleMergeMap) {
+                const item = baseScheduleMergeMap[finger];
+                const sortedWeekStr = Array.from(item.weeks).sort((a,b)=>a-b).join(',');
+                
+                if (!groupedByWeeks[sortedWeekStr]) {
+                    groupedByWeeks[sortedWeekStr] = {
+                        week: Array.from(item.weeks).sort((a,b)=>a-b),
+                        schedule: []
+                    };
+                }
+                groupedByWeeks[sortedWeekStr].schedule.push({
+                    timeRange: item.timeRange, area: item.area, type: item.type, action: item.action
+                });
+            }
+            result.baseSchedule = Object.values(groupedByWeeks);
+
+            // 2. 必然随机事件归一化聚合引擎（修复按特征合并）
+            const mandatoryMergeMap = {};
+
+            detectedMandatories.forEach(item => {
+                const boxCacheKey = `T${item.timeRange}_G${item.groupId}`;
+                const branches = MANDATORY_BRANCHES_DATA[boxCacheKey] || [];
+
+                branches.forEach(b => {
+                    if (!b.area && !b.action) return; 
+                    const t = b.type || "rest";
+                    if (b.area) { uniqueLocations.add(`${b.area}|||${t}`); } 
+
+                    const branchFingerprint = `${item.timeRange}|||${b.probability}|||${b.area}|||${t}|||${b.action}|||${item.groupId}`;
+
+                    if (!mandatoryMergeMap[branchFingerprint]) {
+                        mandatoryMergeMap[branchFingerprint] = {
+                            week: new Set([item.day]),
+                            timeRange: item.timeRange,
+                            probability: b.probability,
+                            area: b.area,
+                            type: t,
+                            action: b.action,
+                            isMandatory: true
+                        };
+                    } else {
+                        mandatoryMergeMap[branchFingerprint].week.add(item.day);
+                    }
+                });
+            });
+
+            for (const key in mandatoryMergeMap) {
+                const obj = mandatoryMergeMap[key];
+                obj.week = Array.from(obj.week).sort((a, b) => a - b); 
+                result.randomEvents.push(obj);
+            }
+
+            // 3. 真随机事件提取
+            document.querySelectorAll('#tbody-true-random tr').forEach(row => {
+                const els = row.querySelectorAll('input');
+                if (els.length < 9) return;
+                const areaVal = els[4].value.trim();
+                const typeVal = els[5].value.trim() || "rest";
+                const actVal = els[6].value.trim();
+                if (!areaVal && !actVal) return;
+
+                if (areaVal) { uniqueLocations.add(`${areaVal}|||${typeVal}`); } 
+
+                result.randomEvents.push({
+                    week: parseWeeks(els[1].value), timeRange: els[2].value.trim(), probability: parseInt(els[3].value, 10) || 0,
+                    area: areaVal, type: typeVal, action: actVal, tip: els[8].value.trim(), persist: els[7].value.trim() === '是'
+                });
+            });
+
+            // 4. 话术数据编译
+            uniqueLocations.forEach(key => {
+                const [area, type] = key.split('|||');
+                const rowEl = document.querySelector(`.text-list-container[data-loc-key="${key.replace(/"/g, '\\"')}"]`);
+                let textArr = [];
+                if (rowEl) {
+                    textArr = Array.from(rowEl.querySelectorAll('.loc-text-input'))
+                                   .map(input => input.value.trim())
+                                   .filter(t => t.length > 0);
+                } else {
+                    textArr = LOCATION_TEXTS_CACHE[key] || [];
+                }
+
+                if (textArr.length === 0) return;
+
+                if (!result.locationRandomActions[area]) result.locationRandomActions[area] = {};
+                result.locationRandomActions[area][type] = textArr;
+            });
+
+            document.getElementById('json-output').textContent = JSON.stringify(result, null, 2);
+            return { detectedMandatories, uniqueLocations };
+        }
+
+        // --- ⭐【反向导入全量重构：深度解析并精确覆盖多周并行的格子】---
+        function importJSON(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    let data = JSON.parse(e.target.result);
+                    if (Array.isArray(data)) { data = data[0]; }
+
+                    document.getElementById('m1-name').value = data.name || "";
+                    document.getElementById('m1-avatar').value = data.avatar || "";
+
+                    initTimelineTable();
+                    MANDATORY_BRANCHES_DATA = {};
+                    LOCATION_TEXTS_CACHE = {};
+
+                    // 1. 反向导入：固定排程回显逻辑修正
+                    if (data.baseSchedule) {
+                        data.baseSchedule.forEach(block => {
+                            // 核心修复：完美轮询读取 week 数组内的每一个数字！
+                            const days = Array.isArray(block.week) ? block.week : [];
+                            if (!block.schedule) return;
+
+                            block.schedule.forEach(item => {
+                                const trange = item.timeRange.replace('-', '–');
+                                const parts = trange.split('–');
+                                let startIdx = TIME_SLOTS.findIndex(s => s.startsWith(parts[0]));
+                                let endIdx = TIME_SLOTS.findIndex(s => s.endsWith(parts[1]));
+
+                                if (startIdx === -1 || endIdx === -1) return;
+
+                                // 在对应的每一个星期数下面渲染数据
+                                days.forEach(d => {
+                                    const master = document.getElementById(`cell-${d}-${startIdx}`);
+                                    if (!master) return;
+
+                                    if (endIdx > startIdx) {
+                                        master.rowSpan = endIdx - startIdx + 1;
+                                        master.querySelector('.btn-split').classList.remove('hidden');
+                                        master.classList.add('bg-slate-50', 'border-b-2', 'border-b-blue-400');
+                                        const hiddenIds = [];
+                                        for (let k = startIdx + 1; k <= endIdx; k++) {
+                                            const subCell = document.getElementById(`cell-${d}-${k}`);
+                                            if (subCell) { subCell.style.display = 'none'; hiddenIds.push(subCell.id); }
+                                        }
+                                        master.setAttribute('data-merged-ids', JSON.stringify(hiddenIds));
+                                    }
+
+                                    master.querySelector('.cell-main-dropdown').value = 'fixed';
+                                    master.querySelector('.cell-area').value = item.area || "";
+                                    master.querySelector('.cell-type').value = item.type || "";
+                                    master.querySelector('.cell-action').value = item.action || "";
+                                });
+                            });
+                        });
+                    }
+
+                    // 2. 反向导入：必然随机事件多周深度回显修复
+                    const tbodyTR = document.getElementById('tbody-true-random'); tbodyTR.innerHTML = "";
+                    let mockGroupCounter = 1;
+                    const timeToGroupMap = {};
+
+                    if (data.randomEvents) {
+                        data.randomEvents.forEach((r, idx) => {
+                            if (r.isMandatory) {
+                                const targetDays = Array.isArray(r.week) ? r.week : [0];
+                                const parts = r.timeRange.split('-');
+                                let startIdx = TIME_SLOTS.findIndex(s => s.startsWith(parts[0]));
+
+                                if (startIdx !== -1) {
+                                    const sharedMapKey = targetDays.join(',') + `_${r.timeRange}`;
+                                    if (!timeToGroupMap[sharedMapKey]) timeToGroupMap[sharedMapKey] = mockGroupCounter++;
+                                    const assignedGroupId = timeToGroupMap[sharedMapKey];
+
+                                    // 将这一组绑定的所有星期的格子同步点亮并隐藏输入框
+                                    targetDays.forEach(day => {
+                                        const master = document.getElementById(`cell-${day}-${startIdx}`);
+                                        if (master) {
+                                            master.querySelector('.cell-main-dropdown').value = 'mandatory';
+                                            master.classList.add('cell-mandatory');
+                                            master.querySelector('.item-group-wrapper').classList.remove('hidden');
+                                            master.querySelector('.item-group-wrapper').classList.add('flex');
+                                            master.querySelector('.cell-input-container').classList.add('hidden');
+                                            master.querySelector('.cell-group-id').value = assignedGroupId;
+                                        }
+                                    });
+
+                                    const cacheKey = `T${r.timeRange}_G${assignedGroupId}`;
+                                    if (!MANDATORY_BRANCHES_DATA[cacheKey]) MANDATORY_BRANCHES_DATA[cacheKey] = [];
+                                    MANDATORY_BRANCHES_DATA[cacheKey].push({
+                                        probability: r.probability || 0, area: r.area || "", type: r.type || "rest", action: r.action || ""
+                                    });
+                                }
+                            } else {
+                                // 恢复纯粹真随机普通表格行
+                                const tr = document.createElement('tr');
+                                tr.innerHTML = `
+                                    <td class="p-1 border-r"><input type="text" value="ev_${idx}" class="w-full border-0 p-0"></td>
+                                    <td class="p-1 border-r"><input type="text" value="${r.week?r.week.join(','):''}" class="w-full text-center border-0 p-0 font-mono"></td>
+                                    <td class="p-1 border-r"><input type="text" value="${r.timeRange||''}" class="w-full text-center border-0 p-0 font-mono"></td>
+                                    <td class="p-1 border-r"><input type="text" value="${r.probability||0}" class="w-full text-center border-0 p-0"></td>
+                                    <td class="p-1 border-r"><input type="text" value="${r.area||''}" list="location-list" class="w-full border-0 p-0"></td>
+                                    <td class="p-1 border-r"><input type="text" value="${r.type||''}" class="w-full border-0 p-0"></td>
+                                    <td class="p-1 border-r"><input type="text" value="${r.action||''}" class="w-full border-0 p-0"></td>
+                                    <td class="p-1 border-r"><input type="text" value="${r.persist?'是':'否'}" class="w-full text-center border-0 p-0"></td>
+                                    <td class="p-1 border-r"><input type="text" value="${r.tip||''}" class="w-full border-0 p-0"></td>
+                                    <td class="p-1 text-center"><button onclick="deleteRow(this)" class="text-gray-300 hover:text-red-500 font-bold">×</button></td>
+                                `;
+                                tbodyTR.appendChild(tr);
+                            }
+                        });
+                    }
+
+                    if (data.locationRandomActions) {
+                        for (const area in data.locationRandomActions) {
+                            for (const type in data.locationRandomActions[area]) {
+                                const textKey = `${area}|||${type}`;
+                                const val = data.locationRandomActions[area][type];
+                                LOCATION_TEXTS_CACHE[textKey] = Array.isArray(val) ? val : [val];
+                            }
+                        }
+                    }
+
+                    updateAll();
+                    alert("🎯 跨周联动全量修复！数据已经完美导入回显。");
+                } catch(e) { alert("导入错误: " + e.message); console.error(e); }
+            };
+            reader.readAsText(file);
+        }
+
+        function parseWeeks(str) {
+            if(!str) return [];
+            let s = str.toString().replace(/\[|\]/g, '').trim();
+            if (s.includes('-')) {
+                const [start, end] = s.split('-').map(Number);
+                const arr = []; for (let i = start; i <= end; i++) arr.push(i); return arr;
+            }
+            return s.split(/[,，]/).map(item => parseInt(item.trim())).filter(n => !isNaN(n));
+        }
+
+        function addTrueRandomRow() {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td class="p-1 border-r"><input type="text" value="ev_rand" class="w-full border-0 p-0"></td>
+                <td class="p-1 border-r"><input type="text" value="2,4" class="w-full text-center border-0 p-0 font-mono"></td>
+                <td class="p-1 border-r"><input type="text" value="13:00-14:00" class="w-full text-center border-0 p-0 font-mono"></td>
+                <td class="p-1 border-r"><input type="text" value="25" class="w-full text-center border-0 p-0"></td>
+                <td class="p-1 border-r"><input type="text" value="融大附中" list="location-list" class="w-full border-0 p-0"></td>
+                <td class="p-1 border-r"><input type="text" value="work" class="w-full border-0 p-0"></td>
+                <td class="p-1 border-r"><input type="text" value="📖 校园健康讲座" class="w-full border-0 p-0"></td>
+                <td class="p-1 border-r"><input type="text" value="是" class="w-full text-center border-0 p-0"></td>
+                <td class="p-1 border-r"><input type="text" value="✨ 校园卫生安全讲座啦！" class="w-full border-0 p-0"></td>
+                <td class="p-1 text-center"><button onclick="deleteRow(this)" class="text-gray-300 hover:text-red-500 font-bold">×</button></td>
+            `;
+            document.getElementById('tbody-true-random').appendChild(tr);
+            updateAll();
+        }
+
+        function deleteRow(btn) { btn.closest('tr').remove(); updateAll(); }
+        
+        function switchTab(id) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.tab-btn-active').forEach(el => el.classList.remove('tab-btn-active'));
+            document.getElementById(`content-${id}`).classList.remove('hidden');
+            document.getElementById(`tab-${id}`).classList.add('tab-btn-active');
+        }
+
+        function updateAll() { 
+            const state = generateJSON(); 
+            syncMandatoryContainersHTML(state.detectedMandatories);
+            syncLocationTextsHTML(state.uniqueLocations);
+        }
+
+        function copyJSON() { navigator.clipboard.writeText(document.getElementById('json-output').textContent).then(() => alert('数据已复制')); }
+        function downloadJSON() {
+            const name = document.getElementById('m1-name').value.trim() || 'role';
+            const blob = new Blob([document.getElementById('json-output').textContent], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a'); a.href = url; a.download = `${name}_config.json`; a.click(); URL.revokeObjectURL(url);
+        }
+
+        window.onload = function() {
+            initTimelineTable();
+            document.getElementById('excel-main-table').addEventListener('input', updateAll);
+            document.getElementById('tbody-true-random').addEventListener('input', updateAll);
+            updateAll();
+        };
+    </script>
+</body>
+</html>
